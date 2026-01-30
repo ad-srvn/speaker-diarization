@@ -18,12 +18,6 @@ The backend is built using **FastAPI**, and the frontend is a lightweight HTML/J
 
 
 ![Diarization UI Screenshot](assets/screenshot.png)
-
-Place your image at:
-```
-assets/screenshot.png
-```
-
 ---
 
 ## Project Structure 
