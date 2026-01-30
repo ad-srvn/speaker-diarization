@@ -1,0 +1,518 @@
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Diarization Viewer</title>
+
+  <style>
+    :root{
+      --bg:#0b1020;
+      --card:#111a33;
+      --card2:#0f1730;
+      --text:#e8ecff;
+      --muted:#a9b2d6;
+      --border:rgba(255,255,255,0.10);
+      --accent:#7aa2ff;
+      --accent2:#22c55e;
+      --danger:#ef4444;
+      --shadow: 0 10px 30px rgba(0,0,0,0.35);
+      --radius:18px;
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background: radial-gradient(1200px 600px at 20% 10%, rgba(122,162,255,0.25), transparent 60%),
+                  radial-gradient(900px 500px at 80% 30%, rgba(34,197,94,0.16), transparent 55%),
+                  var(--bg);
+      color:var(--text);
+      padding:24px;
+    }
+
+    .container{max-width:1100px;margin:0 auto}
+
+    .header{
+      display:flex; align-items:flex-end; justify-content:space-between;
+      gap:16px; margin-bottom:18px;
+    }
+    .title{
+      font-size:28px; font-weight:750; letter-spacing:0.2px; margin:0;
+    }
+    .subtitle{
+      margin:6px 0 0 0;
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.35;
+    }
+
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .card-inner{padding:16px 16px 18px 16px}
+
+    .row{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-bottom:12px;
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 10px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background: rgba(0,0,0,0.18);
+      color:var(--muted);
+      font-size:13px;
+      user-select:none;
+    }
+
+    .btn{
+      appearance:none;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,0.06);
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:12px;
+      font-weight:650;
+      cursor:pointer;
+      transition: transform 0.05s ease, background 0.15s ease, border 0.15s ease;
+    }
+    .btn:hover{background: rgba(255,255,255,0.10)}
+    .btn:active{transform: translateY(1px)}
+    .btn.primary{
+      background: linear-gradient(180deg, rgba(122,162,255,0.95), rgba(122,162,255,0.65));
+      border:1px solid rgba(122,162,255,0.55);
+      color:#0b1020;
+    }
+    .btn.primary:hover{background: linear-gradient(180deg, rgba(122,162,255,1), rgba(122,162,255,0.72))}
+    .btn.green{
+      background: linear-gradient(180deg, rgba(34,197,94,0.95), rgba(34,197,94,0.65));
+      border:1px solid rgba(34,197,94,0.55);
+      color:#07150e;
+    }
+
+    input[type="file"]{
+      width: 340px;
+      max-width: 100%;
+      padding:10px;
+      border-radius:12px;
+      border:1px dashed var(--border);
+      background: rgba(0,0,0,0.18);
+      color: var(--muted);
+    }
+
+    select{
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      background: rgba(0,0,0,0.18);
+      color: var(--text);
+      min-width: 260px;
+      max-width: 100%;
+      outline: none;
+    }
+    select option{
+      background: #0b1020;
+      color: var(--text);
+    }
+
+    .status{
+      margin-top:6px;
+      color: var(--muted);
+      font-size:13px;
+      min-height:18px;
+    }
+    .status strong{color: var(--text)}
+
+    /* Wave container */
+    #wavewrap{
+      position: relative;
+      width: 100%;
+      height: 260px;
+      border:1px solid var(--border);
+      border-radius: 16px;
+      background: rgba(0,0,0,0.18);
+      overflow:hidden;
+    }
+    #wave{
+      width:100%;
+      height:260px;
+    }
+    #overlay{
+      position:absolute; left:0; top:0; width:100%; height:100%;
+      pointer-events:none;
+    }
+    .seg{
+      position:absolute;
+      top:0; height:100%;
+      opacity:0.22;
+      border-right: 1px solid rgba(255,255,255,0.05);
+    }
+    #cursor{
+      position:absolute;
+      top:0;
+      width:2px;
+      height:100%;
+      background: var(--danger);
+      pointer-events:none;
+      box-shadow: 0 0 0 1px rgba(239,68,68,0.18);
+    }
+
+    /* Legend */
+    .legend{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px 14px;
+      margin-top:12px;
+      align-items:flex-start;
+    }
+    .legend-item{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid var(--border);
+      background: rgba(0,0,0,0.18);
+    }
+    .swatch{
+      width:12px; height:12px; border-radius:3px;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.15) inset;
+    }
+    .legend-text{
+      display:flex; flex-direction:column; gap:2px;
+    }
+    .legend-title{
+      font-size:13px; font-weight:750; color:var(--text);
+      line-height:1.1;
+    }
+    .legend-sub{
+      font-size:12px; color:var(--muted);
+    }
+    .rename{
+      margin-left:8px;
+      width:140px;
+      max-width: 40vw;
+      padding:8px 10px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      font-size:13px;
+      outline:none;
+    }
+
+    details{
+      margin-top:12px;
+      border-radius:14px;
+      border:1px solid var(--border);
+      background: rgba(0,0,0,0.18);
+      overflow:hidden;
+    }
+    summary{
+      cursor:pointer;
+      padding:12px 14px;
+      color: var(--muted);
+      font-weight:650;
+      user-select:none;
+    }
+    pre{
+      margin:0;
+      padding:12px 14px;
+      border-top:1px solid var(--border);
+      overflow:auto;
+      color: #d6dbff;
+      background: rgba(0,0,0,0.12);
+      font-size:12px;
+      line-height:1.35;
+    }
+
+    .spacer{height:12px}
+    .divider{
+      height:1px;
+      width:100%;
+      background: var(--border);
+      margin: 10px 0 14px 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1 class="title">Speaker Diarization Viewer</h1>
+        <p class="subtitle">Upload audio → backend returns segments → waveform + colored speakers + cursor synced to playback.</p>
+      </div>
+      <div class="pill" id="pill">Backend: <strong>&nbsp;127.0.0.1:8000</strong></div>
+    </div>
+
+    <div class="card">
+      <div class="card-inner">
+        <div class="row">
+          <input type="file" id="file" />
+          <button class="btn primary" id="run">Upload + Diarize</button>
+          <button class="btn green" id="play">Play / Pause</button>
+          <button class="btn" id="stop">Stop</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="row">
+          <select id="sample"></select>
+          <button class="btn primary" id="runSample">Try Sample</button>
+          <div class="pill" id="sampleHint">Uses <code>/diarize_url</code> (backend must expose samples)</div>
+        </div>
+
+        <div class="status" id="status">Status: <strong>Idle</strong></div>
+
+        <div id="wavewrap" class="spacer">
+          <div id="wave"></div>
+          <div id="overlay"></div>
+          <div id="cursor"></div>
+        </div>
+
+        <div class="legend" id="legend"></div>
+
+        <details>
+          <summary>Show raw JSON response</summary>
+          <pre id="out">{}</pre>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/wavesurfer.js@7"></script>
+  <script>
+    const API = "http://127.0.0.1:8000";
+
+    const overlay = document.getElementById("overlay");
+    const cursor = document.getElementById("cursor");
+    const out = document.getElementById("out");
+    const statusEl = document.getElementById("status");
+    const legendEl = document.getElementById("legend");
+    const sampleSelect = document.getElementById("sample");
+
+    let ws = null;
+    let duration = 1;
+    let speakerNames = {}; // speakerId -> custom name
+
+    function setStatus(text){
+      statusEl.innerHTML = "Status: <strong>" + text + "</strong>";
+    }
+
+    function colorForSpeaker(k) {
+      const colors = ["#7aa2ff","#22c55e","#ff7f0e","#ef4444","#a855f7","#14b8a6","#eab308","#f97316","#60a5fa","#34d399"];
+      return colors[Math.abs(k) % colors.length];
+    }
+
+    function uniqueSpeakers(segments){
+      const set = new Set();
+      (segments || []).forEach(s => set.add(Number(s.speaker)));
+      return Array.from(set).sort((a,b)=>a-b);
+    }
+
+    function renderSegments(segments) {
+      overlay.innerHTML = "";
+      (segments || []).forEach(seg => {
+        const div = document.createElement("div");
+        div.className = "seg";
+        div.style.left = (seg.start / duration * 100) + "%";
+        div.style.width = ((seg.end - seg.start) / duration * 100) + "%";
+        div.style.background = colorForSpeaker(seg.speaker);
+        overlay.appendChild(div);
+      });
+    }
+
+    function setCursor(t) {
+      const pct = (t / duration) * 100;
+      cursor.style.left = pct + "%";
+    }
+
+    function renderLegend(segments){
+      legendEl.innerHTML = "";
+      const speakers = uniqueSpeakers(segments);
+      if (speakers.length === 0){
+        legendEl.innerHTML = `<div class="pill">No speakers detected</div>`;
+        return;
+      }
+
+      speakers.forEach(spk => {
+        const item = document.createElement("div");
+        item.className = "legend-item";
+
+        const sw = document.createElement("div");
+        sw.className = "swatch";
+        sw.style.background = colorForSpeaker(spk);
+
+        const txt = document.createElement("div");
+        txt.className = "legend-text";
+
+        const title = document.createElement("div");
+        title.className = "legend-title";
+        title.textContent = speakerNames[spk] ? speakerNames[spk] : `SPEAKER_${String(spk).padStart(2,"0")}`;
+
+        const sub = document.createElement("div");
+        sub.className = "legend-sub";
+        sub.textContent = "Rename:";
+
+        const input = document.createElement("input");
+        input.className = "rename";
+        input.placeholder = "Name (optional)";
+        input.value = speakerNames[spk] || "";
+        input.addEventListener("input", (e) => {
+          speakerNames[spk] = e.target.value.trim();
+          renderLegend(segments);
+        });
+
+        txt.appendChild(title);
+        txt.appendChild(sub);
+
+        item.appendChild(sw);
+        item.appendChild(txt);
+        item.appendChild(input);
+
+        legendEl.appendChild(item);
+      });
+    }
+
+    async function diarizeUpload(file) {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(API + "/diarize", { method: "POST", body: form });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    }
+
+    async function diarizeSampleUrl(sampleUrl) {
+      const res = await fetch(API + "/diarize_url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: sampleUrl })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    }
+
+    function attachWaveSurfer(audioUrl, segments){
+      if (ws) ws.destroy();
+
+      ws = WaveSurfer.create({
+        container: "#wave",
+        waveColor: "#c7cbe1",
+        progressColor: "#6b7280",
+        cursorColor: "transparent", 
+        height: 260,
+        normalize: true
+      });
+
+      setStatus("Loading audio…");
+      ws.load(API + audioUrl);
+
+      ws.on("ready", () => {
+        duration = ws.getDuration() || 1;
+        renderSegments(segments);
+        renderLegend(segments);
+        setCursor(0);
+        setStatus(`Ready • ${duration.toFixed(2)}s • ${uniqueSpeakers(segments).length} speaker(s)`);
+      });
+
+      ws.on("audioprocess", () => setCursor(ws.getCurrentTime()));
+      ws.on("seek", () => setCursor(ws.getCurrentTime()));
+      ws.on("pause", () => setCursor(ws.getCurrentTime()));
+      ws.on("finish", () => setCursor(duration));
+    }
+
+    function resetUiForRun(){
+      out.textContent = "{}";
+      legendEl.innerHTML = "";
+      overlay.innerHTML = "";
+      setCursor(0);
+      speakerNames = {};
+    }
+
+    function initSamples(){
+      const SAMPLES = [
+        { name: "Choose a sample…", url: "" },
+        { name: "Interview", url: API + "/samples/interview.wav" },
+        { name: "Five Speakers", url: API + "/samples/five_speakers.wav" },
+        { name: "Five Speakers with overlap", url: API + "/samples/five_speaker_overlap.wav" }
+      ];
+
+      sampleSelect.innerHTML = "";
+      SAMPLES.forEach((s, idx) => {
+        const opt = document.createElement("option");
+        opt.value = s.url;
+        opt.textContent = s.name;
+        if (idx === 0){
+          opt.disabled = true;
+          opt.selected = true;
+        }
+        sampleSelect.appendChild(opt);
+      });
+    }
+
+    initSamples();
+
+    document.getElementById("run").onclick = async () => {
+      const f = document.getElementById("file").files[0];
+      if (!f) return;
+
+      try{
+        resetUiForRun();
+        setStatus("Uploading + diarizing…");
+
+        const data = await diarizeUpload(f);
+        out.textContent = JSON.stringify(data, null, 2);
+        attachWaveSurfer(data.audioUrl, data.speakers || []);
+      } catch(err){
+        setStatus("Error (see JSON)");
+        out.textContent = String(err);
+        console.error(err);
+      }
+    };
+
+    document.getElementById("runSample").onclick = async () => {
+      const url = sampleSelect.value;
+      if (!url){
+        setStatus("Pick a sample first");
+        return;
+      }
+
+      try{
+        resetUiForRun();
+        setStatus("Fetching sample + diarizing…");
+
+        const data = await diarizeSampleUrl(url);
+        out.textContent = JSON.stringify(data, null, 2);
+        attachWaveSurfer(data.audioUrl, data.speakers || []);
+      } catch(err){
+        setStatus("Error (see JSON)");
+        out.textContent = String(err);
+        console.error(err);
+      }
+    };
+
+    document.getElementById("play").onclick = () => {
+      if (ws) ws.playPause();
+    };
+
+    document.getElementById("stop").onclick = () => {
+      if (!ws) return;
+      ws.pause();
+      ws.seekTo(0);
+      setCursor(0);
+    };
+  </script>
+</body>
+</html>
