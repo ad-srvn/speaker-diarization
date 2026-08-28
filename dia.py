@@ -293,48 +293,10 @@ def diarization_json_from_chunks_labels(
     min_dur: float = 0.20,
     decimals: int = 3,
 ) -> dict:
-    """
-    Build the JSON payload for the frontend, automatically determining
-    the true audio duration from the audio file.
-
-    Output format:
-    {
-      "audioUrl": "...",
-      "duration": <float>,
-      "speakers": [
-        {"start":..., "end":..., "speaker":...},
-        ...
-      ]
-    }
-
-    Parameters
-    ----------
-    audio_url : str
-        URL served to the browser (e.g. "/files/abcd.wav").
-    audio_path : str
-        Local filesystem path to the audio file.
-    chunks : list[dict]
-        [{"start": float, "end": float}, ...] in seconds.
-    labels : array-like
-        Speaker label per chunk (same length as chunks).
-    merge_gap : float
-        Merge same-speaker segments if gap <= merge_gap seconds.
-    min_dur : float
-        Drop segments shorter than this duration.
-    decimals : int
-        Decimal precision for times in output.
-
-    Returns
-    -------
-    dict
-        JSON-ready diarization payload.
-    """
-
-    # ---- determine real duration from file ----
+    
     info = sf.info(audio_path)
     duration = info.frames / float(info.samplerate)
 
-    # ---- validation ----
     chunks = list(chunks) if chunks is not None else []
     labels = np.asarray(labels) if labels is not None else np.array([], dtype=int)
 
@@ -343,7 +305,6 @@ def diarization_json_from_chunks_labels(
             f"chunks and labels must have same length: {len(chunks)} vs {len(labels)}"
         )
 
-    # ---- build raw labeled segments ----
     items = []
     for c, lab in zip(chunks, labels):
         if not isinstance(c, dict) or "start" not in c or "end" not in c:
@@ -358,14 +319,10 @@ def diarization_json_from_chunks_labels(
             continue
         items.append((s, e, spk))
 
-    # sort by time
     items.sort(key=lambda x: (x[0], x[1]))
-
-    # clamp to valid audio range
     def clamp(t: float) -> float:
         return max(0.0, min(duration, float(t)))
 
-    # ---- merge adjacent same-speaker segments ----
     merged = []
     for s, e, spk in items:
         s = clamp(s)
@@ -383,7 +340,6 @@ def diarization_json_from_chunks_labels(
         else:
             merged.append([s, e, spk])
 
-    # ---- finalize output ----
     speakers = []
     for s, e, spk in merged:
         if (e - s) >= min_dur:
