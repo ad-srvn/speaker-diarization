@@ -86,7 +86,7 @@ def extract_ecapa(audio_16k_mono: torch.Tensor, chunks, device=None):
     import torch
 
     model = get_ecapa(device=device)
-    device = model.device  # ensure consistent
+    device = model.device
     wav = audio_16k_mono.to(device)
 
     embs = []
