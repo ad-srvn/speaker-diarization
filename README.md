@@ -1,170 +1,97 @@
-# Speaker Diarization
+# Speaker Diarization Studio
 
-An end-to-end **speaker diarization system** with a clean web interface.
+A self-contained local web app that identifies who spoke and when. It also measures
+diarization error rate (DER) from audio files paired with RTTM annotations.
 
-Users can:
-- Upload any speech audio file (`.wav`, `.mp3`, `.m4a`, etc.)
-- Try built-in **sample audio files**
-- View a waveform with **speaker-colored segments**
-- Play audio with a **moving cursor synced to time**
-- Inspect diarization results as structured JSON
+![Speaker Diarization Studio](assets/screenshot.png)
 
-The backend is built using **FastAPI**, and the frontend is a lightweight HTML/JavaScript app using **WaveSurfer.js**.
+## Features
 
----
+- Upload WAV, MP3, M4A, AAC, FLAC, OGG, Opus, MP4, or WebM audio.
+- Review speaker-colored turns alongside synchronized audio and a waveform.
+- Evaluate VoxConverse-style datasets made of matching audio and RTTM files.
+- View and export per-file and overall accuracy results as CSV or JSON.
+- Run locally in one FastAPI process; uploaded evaluation data is temporary.
 
-## Demo Screenshot 
+The pipeline uses Silero VAD, SpeechBrain ECAPA speaker embeddings, overlapping
+two-second speech windows, and agglomerative clustering with a default distance
+threshold of `0.85`.
 
+## Tested accuracy
 
+On a tested 33-recording subset of VoxConverse development data, the pipeline
+achieved **9.537% duration-weighted DER** and **9.607% aggregate DER**. Evaluation
+used a `0.25`-second collar and scored overlapping speech. These numbers apply only
+to that fixed subset, not the complete VoxConverse benchmark.
 
-![Diarization UI Screenshot](assets/screenshot.png)
----
+## Run the app
 
-## Project Structure 
+Install these system prerequisites:
 
-```
-Speaker Diarization/
-│
-├── main.py                # FastAPI server (API + static file hosting)
-├── dia.py                 # Diarization pipeline (VAD, ECAPA, AHC, JSON)
-├── requirements.txt
-├── README.md
-│
-├── frontend/
-│   └── index.html         # Web UI (waveform, legend, cursor)
-│
-├── uploads/               # Uploaded audio files (server-side)
-├── outputs/               # Converted WAV files served to browser (/files/*)
-├── samples/               # Sample audio files served to browser (/samples/*)
-└── assets/
-    └── screenshot.png     # UI screenshot for README
-```
+- Python 3.12, 3.13, or 3.14
+- ffmpeg
 
----
-
-## Diarization Pipeline 
-
-1. **Voice Activity Detection (VAD)**  
-   Uses Silero VAD to detect speech regions.
-
-2. **Chunking**  
-   Speech regions are split into overlapping chunks.
-
-3. **Speaker Embeddings**  
-   ECAPA-TDNN embeddings via SpeechBrain.
-
-4. **Clustering**  
-   Agglomerative Hierarchical Clustering (cosine distance).
-
-5. **Post-processing**  
-   Merge adjacent segments and remove very short segments.
-
----
-
-## Requirements 
-
-### System Dependency
-
-You must have **ffmpeg** installed (required for decoding `.m4a` and other formats).
-
-**macOS**
-```bash
-brew install ffmpeg
-```
-
-**Ubuntu / Debian**
-```bash
-sudo apt-get update
-sudo apt-get install -y ffmpeg
-```
-
-Verify:
-```bash
-ffmpeg -version
-```
-
----
-
-### Python Dependencies 
+On macOS:
 
 ```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+brew install python ffmpeg
 ```
 
----
-
-## Running the Backend 
-
-From the project root (the folder containing `main.py`):
+On Ubuntu or Debian:
 
 ```bash
-uvicorn main:app --reload --port 8000
+sudo apt update
+sudo apt install python3 python3-venv ffmpeg
 ```
 
-API docs:
-```
-http://127.0.0.1:8000/docs
-```
-
-Static routes:
-- `/files/*` → `outputs/`
-- `/samples/*` → `samples/`
-
----
-
-## Running the Frontend 
-
-From the `frontend/` directory:
+Clone the repository, enter its directory, and run:
 
 ```bash
-python -m http.server 5173
+./run.sh
 ```
 
-Open:
-```
-http://127.0.0.1:5173/index.html
-```
+The first launch creates `.venv` and installs the required packages. The first
+diarization also downloads the speaker model from Hugging Face; model weights are
+not stored in this repository. Later launches reuse both the environment and the
+downloaded model. The app opens at
+[http://127.0.0.1:8000](http://127.0.0.1:8000).
 
-Ensure your frontend points to the backend:
-```js
-const API = "http://127.0.0.1:8000";
-```
+Stop the app with `Ctrl+C`. To launch without opening a browser:
 
----
-
-## API Endpoints 🔗
-
-### POST `/diarize`
-
-Upload an audio file and return diarization results.
-
-Example response:
-```json
-{
-  "audioUrl": "/files/abcd1234.wav",
-  "duration": 28.755,
-  "speakers": [
-    { "start": 0.5, "end": 3.1, "speaker": 0 },
-    { "start": 3.7, "end": 5.6, "speaker": 0 }
-  ]
-}
+```bash
+./run.sh --no-browser
 ```
 
----
+## Accuracy-test folder format
 
-### POST `/diarize_url`
+Select a folder containing audio and RTTM files with matching basenames:
 
-Run diarization on a sample audio file served from `/samples/*`.
+```text
+dataset/
+├── audio/
+│   ├── recording_1.wav
+│   └── recording_2.wav
+└── rttm/
+    ├── recording_1.rttm
+    └── recording_2.rttm
+```
 
-Used by the **“Try Sample”** button in the UI.
+The folder may contain unrelated files; the app uses supported audio and `.rttm`
+files only. Every selected audio file must have a matching annotation.
 
----
+## Project layout
 
-## Notes 
+```text
+app.py                  Application launcher
+main.py                 FastAPI server and API routes
+dia.py                  Diarization pipeline
+voxconverse_utils.py    RTTM parsing and DER scoring
+frontend/index.html     Browser interface
+samples/                Built-in sample recordings
+assets/screenshot.png   README preview
+requirements.txt        Python dependencies
+run.sh                  One-command setup and launch
+```
 
-- The first request may be slow due to model initialization.
-- Speaker IDs are **cluster labels**, not real identities.
-- Sample files must exist in the `samples/` folder to appear in the UI.
-- Intended for **demo, research, and portfolio use**.
+API documentation is available while the app is running at
+[http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).

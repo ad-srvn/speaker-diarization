@@ -1,14 +1,15 @@
-fastapi==0.115.6
-uvicorn[standard]==0.30.6
-python-multipart==0.0.9
-requests==2.32.3
+fastapi==0.142.1
+uvicorn[standard]==0.54.0
+python-multipart==0.0.32
 
-numpy==1.26.4
-scikit-learn==1.5.2
-soundfile==0.12.1
-librosa==0.10.2.post1
-matplotlib==3.9.2
+numpy==2.5.3
+scikit-learn==1.9.1
+soundfile==0.14.0
+librosa==1.0.0
+matplotlib==3.11.2
 
-torch
-speechbrain==0.5.16
-silero-vad==5.1.2
+torch==2.14.0
+torchaudio==2.11.0
+speechbrain==1.1.1
+huggingface_hub==2.0.0
+silero-vad==6.2.3

@@ -2,11 +2,15 @@
 __pycache__/
 *.pyc
 venv/
+.venv/
 .env
 
 # Generated audio
 uploads/
 outputs/
+data/
+benchmark_outputs/
+pretrained_models/
 
 # OS junk
 .DS_Store

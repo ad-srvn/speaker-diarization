@@ -1,15 +1,14 @@
+from __future__ import annotations
+
 import torch
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
-import time
-import soundfile as sf
 import os
 import subprocess
 
 _SILERO_MODEL = None
 _ECAPA = None
 _ECAPA_DEVICE = None
+DEFAULT_CLUSTERING_THRESHOLD = 0.85
 
 def get_silero():
     global _SILERO_MODEL
@@ -21,7 +20,12 @@ def get_silero():
 def get_ecapa(device=None):
     global _ECAPA, _ECAPA_DEVICE
     import torch
-    from speechbrain.inference.speaker import EncoderClassifier
+    try:
+        # SpeechBrain >= 1.0
+        from speechbrain.inference.speaker import EncoderClassifier
+    except ModuleNotFoundError:
+        # The repository currently pins SpeechBrain 0.5.16.
+        from speechbrain.pretrained import EncoderClassifier
 
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -127,6 +131,8 @@ def play_with_moving_cursor_stream(
     title: str = "Diarization playback",
     show_nospeech: bool = True,
 ):
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation
     import soundfile as sf
     import librosa
     import sounddevice as sd
@@ -293,7 +299,8 @@ def diarization_json_from_chunks_labels(
     min_dur: float = 0.20,
     decimals: int = 3,
 ) -> dict:
-    
+    import soundfile as sf
+
     info = sf.info(audio_path)
     duration = info.frames / float(info.samplerate)
 
@@ -357,10 +364,12 @@ def diarization_json_from_chunks_labels(
         "speakers": speakers,
     }
 def to_wav_16k_mono_ffmpeg(in_path: str, out_path: str, target_sr: int = 16000) -> float:
+    import soundfile as sf
+
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
 
     cmd = [
-        "ffmpeg", "-y",
+        "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
         "-i", in_path,
         "-ac", "1",
         "-ar", str(target_sr),
@@ -371,60 +380,108 @@ def to_wav_16k_mono_ffmpeg(in_path: str, out_path: str, target_sr: int = 16000) 
 
     info = sf.info(out_path)
     return info.frames / float(info.samplerate)
+
+
+def chunks_to_segments(
+    chunks: list,
+    labels,
+    merge_gap: float = 0.15,
+    min_dur: float = 0.20,
+):
+    """Turn overlapping classification windows into a hard diarization timeline.
+
+    ``chunker`` deliberately creates overlapping windows. Treating every window as
+    an output segment makes that overlap look like simultaneous speakers. Instead,
+    split the timeline at window boundaries and let the active windows vote for one
+    speaker. This mirrors what the UI playback code already does, but without
+    quantizing time into fixed-size bins.
+    """
+    chunks = list(chunks) if chunks is not None else []
+    labels = np.asarray(labels) if labels is not None else np.array([], dtype=int)
+    if len(chunks) != len(labels):
+        raise ValueError(f"chunks and labels length mismatch: {len(chunks)} vs {len(labels)}")
+
+    windows = []
+    for index, (chunk, label) in enumerate(zip(chunks, labels)):
+        if not isinstance(chunk, dict) or "start" not in chunk or "end" not in chunk:
+            continue
+        start = float(chunk["start"])
+        end = float(chunk["end"])
+        if end <= start:
+            continue
+        windows.append((start, end, int(label), index))
+
+    if not windows:
+        return []
+
+    boundaries = sorted({value for start, end, _, _ in windows for value in (start, end)})
+    voted = []
+    for start, end in zip(boundaries, boundaries[1:]):
+        if end <= start:
+            continue
+        midpoint = (start + end) / 2.0
+        active = [window for window in windows if window[0] < end and window[1] > start]
+        if not active:
+            continue
+
+        votes = {}
+        for _, _, speaker, _ in active:
+            votes[speaker] = votes.get(speaker, 0) + 1
+        best_count = max(votes.values())
+        tied = {speaker for speaker, count in votes.items() if count == best_count}
+        if len(tied) == 1:
+            speaker = next(iter(tied))
+        else:
+            # Prefer the tied window whose centre is closest to this interval.
+            speaker = min(
+                (window for window in active if window[2] in tied),
+                key=lambda window: (abs(((window[0] + window[1]) / 2.0) - midpoint), window[3]),
+            )[2]
+
+        if voted and voted[-1][2] == speaker and start <= voted[-1][1] + 1e-9:
+            voted[-1][1] = end
+        else:
+            voted.append([start, end, speaker])
+
+    merged = []
+    for start, end, speaker in voted:
+        if merged and merged[-1][2] == speaker and start <= merged[-1][1] + merge_gap:
+            merged[-1][1] = max(merged[-1][1], end)
+        else:
+            merged.append([start, end, speaker])
+
+    return [
+        {"start": start, "end": end, "speaker": speaker}
+        for start, end, speaker in merged
+        if end - start >= min_dur
+    ]
+
+
 def make_diarization_payload(
     audio_url: str,
-    audio_path: str,  
+    audio_path: str,
     chunks: list,
     labels,
     merge_gap: float = 0.15,
     min_dur: float = 0.20,
     decimals: int = 3,
 ) -> dict:
+    import soundfile as sf
+
     info = sf.info(audio_path)
     duration = info.frames / float(info.samplerate)
 
-    chunks = list(chunks) if chunks is not None else []
-    labels = np.asarray(labels) if labels is not None else np.array([], dtype=int)
-
-    if len(chunks) != len(labels):
-        raise ValueError(f"chunks and labels length mismatch: {len(chunks)} vs {len(labels)}")
-
-    items = []
-    for c, lab in zip(chunks, labels):
-        if not isinstance(c, dict) or "start" not in c or "end" not in c:
-            continue
-        s = float(c["start"])
-        e = float(c["end"])
-        if e <= s:
-            continue
-        items.append((s, e, int(lab)))
-
-    items.sort(key=lambda x: (x[0], x[1]))
-
-    def clamp(t: float) -> float:
-        return max(0.0, min(duration, float(t)))
-
-    merged = []
-    for s, e, spk in items:
-        s = clamp(s); e = clamp(e)
-        if e <= s:
-            continue
-        if not merged:
-            merged.append([s, e, spk]); continue
-        ps, pe, pspk = merged[-1]
-        if spk == pspk and s <= pe + merge_gap:
-            merged[-1][1] = max(pe, e)
-        else:
-            merged.append([s, e, spk])
-
     speakers = []
-    for s, e, spk in merged:
-        if (e - s) >= min_dur:
-            speakers.append({
-                "start": round(s, decimals),
-                "end": round(e, decimals),
-                "speaker": int(spk),
-            })
+    for segment in chunks_to_segments(chunks, labels, merge_gap=merge_gap, min_dur=min_dur):
+        start = max(0.0, min(duration, float(segment["start"])))
+        end = max(0.0, min(duration, float(segment["end"])))
+        if end <= start:
+            continue
+        speakers.append({
+            "start": round(start, decimals),
+            "end": round(end, decimals),
+            "speaker": int(segment["speaker"]),
+        })
 
     return {
         "audioUrl": audio_url,
@@ -444,7 +501,7 @@ def diarize_file(audio_path: str):
     if embs.shape[0] == 0:
         return chunks, np.array([], dtype=int)
 
-    labels, K = ahc_cluster_labels(embs, distance_threshold=0.71)
+    labels, K = ahc_cluster_labels(embs, distance_threshold=DEFAULT_CLUSTERING_THRESHOLD)
 
     remap = {}
     next_id = 0
@@ -470,6 +527,10 @@ def diarizer_with_plot(path):
     if embs.shape[0] == 0:
         print("No embeddings extracted (chunks too short or no speech).")
         quit()
-    labels, K = ahc_cluster_labels(embs, distance_threshold=0.75, linkage="average")
+    labels, K = ahc_cluster_labels(
+        embs,
+        distance_threshold=DEFAULT_CLUSTERING_THRESHOLD,
+        linkage="average",
+    )
     print("Speakers:", K)
     play_with_moving_cursor_stream(audio_path=path,chunks=chunks,labels=labels,title="Waveform colored by speakers")

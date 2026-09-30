@@ -1,518 +1,473 @@
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Diarization Viewer</title>
-
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Local speaker diarization and RTTM accuracy testing.">
+  <title>Speaker Diarization Studio</title>
   <style>
-    :root{
-      --bg:#0b1020;
-      --card:#111a33;
-      --card2:#0f1730;
-      --text:#e8ecff;
-      --muted:#a9b2d6;
-      --border:rgba(255,255,255,0.10);
-      --accent:#7aa2ff;
-      --accent2:#22c55e;
-      --danger:#ef4444;
-      --shadow: 0 10px 30px rgba(0,0,0,0.35);
-      --radius:18px;
+    :root {
+      color-scheme: dark;
+      --bg: #07100e;
+      --surface: #0e1a17;
+      --surface-soft: #13231e;
+      --ink: #edf6f2;
+      --muted: #9bada6;
+      --line: rgba(224, 242, 234, .13);
+      --brand: #2ba47f;
+      --brand-dark: #218064;
+      --accent: #dcf268;
+      --danger: #ff8178;
+      --shadow: 0 20px 60px rgba(0, 0, 0, .28);
+      --radius: 20px;
     }
-
-    *{box-sizing:border-box}
-    body{
-      margin:0;
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-      background: radial-gradient(1200px 600px at 20% 10%, rgba(122,162,255,0.25), transparent 60%),
-                  radial-gradient(900px 500px at 80% 30%, rgba(34,197,94,0.16), transparent 55%),
-                  var(--bg);
-      color:var(--text);
-      padding:24px;
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 7% 0%, rgba(43, 164, 127, .19), transparent 30rem),
+        radial-gradient(circle at 92% 12%, rgba(220, 242, 104, .08), transparent 24rem),
+        var(--bg);
+      font: 15px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-
-    .container{max-width:1100px;margin:0 auto}
-
-    .header{
-      display:flex; align-items:flex-end; justify-content:space-between;
-      gap:16px; margin-bottom:18px;
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    .shell { width: min(1120px, calc(100% - 32px)); margin: 0 auto; padding: 30px 0 60px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 28px; }
+    .brand { display: flex; align-items: center; gap: 13px; }
+    .brand-mark {
+      width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center;
+      color: #04110d; background: var(--accent); box-shadow: 0 8px 24px rgba(0, 0, 0, .3);
+      font-size: 20px; font-weight: 800;
     }
-    .title{
-      font-size:28px; font-weight:750; letter-spacing:0.2px; margin:0;
+    h1 { margin: 0; font-size: clamp(22px, 3vw, 30px); letter-spacing: -.04em; }
+    .health { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #d0d5d2; }
+    .dot.online { background: #22a06b; box-shadow: 0 0 0 4px rgba(34, 160, 107, .12); }
+    .hero { display: grid; grid-template-columns: 1.35fr .65fr; gap: 18px; margin-bottom: 18px; }
+    .intro, .facts, .card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
+    .intro { padding: 30px; }
+    .intro h2 { max-width: 670px; margin: 0 0 10px; font-size: clamp(28px, 5vw, 48px); line-height: 1.04; letter-spacing: -.055em; }
+    .intro p { margin: 0; max-width: 690px; color: var(--muted); font-size: 16px; }
+    .facts { padding: 22px; background: linear-gradient(145deg, #12362d, #0b211c); color: white; }
+    .fact { padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,.17); }
+    .fact:last-child { border: 0; }
+    .fact strong { display: block; font-size: 20px; }
+    .fact span { color: rgba(255,255,255,.68); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+    .fact small { display: block; margin-top: 2px; color: rgba(255,255,255,.62); font-size: 11px; }
+    .tabs { display: flex; gap: 6px; width: fit-content; padding: 5px; margin: 0 0 16px; border: 1px solid var(--line); border-radius: 14px; background: rgba(14,26,23,.84); }
+    .tab { border: 0; border-radius: 10px; padding: 10px 16px; color: var(--muted); background: transparent; font-weight: 750; }
+    .tab.active { color: white; background: var(--brand); }
+    .panel[hidden] { display: none; }
+    .card { padding: 24px; }
+    .card + .card { margin-top: 16px; }
+    .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+    .card h3 { margin: 0 0 4px; font-size: 20px; letter-spacing: -.025em; }
+    .help { margin: 0; color: var(--muted); }
+    .drop {
+      display: grid; place-items: center; min-height: 160px; padding: 25px; text-align: center;
+      border: 1.5px dashed #496159; border-radius: 16px; background: var(--surface-soft);
+      transition: .15s border-color, .15s background;
     }
-    .subtitle{
-      margin:6px 0 0 0;
-      color:var(--muted);
-      font-size:14px;
-      line-height:1.35;
-    }
-
-    .card{
-      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
-      border:1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      overflow:hidden;
-    }
-    .card-inner{padding:16px 16px 18px 16px}
-
-    .row{
-      display:flex;
-      gap:12px;
-      flex-wrap:wrap;
-      align-items:center;
-      margin-bottom:12px;
-    }
-
-    .pill{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:8px 10px;
-      border-radius:999px;
-      border:1px solid var(--border);
-      background: rgba(0,0,0,0.18);
-      color:var(--muted);
-      font-size:13px;
-      user-select:none;
-    }
-
-    .btn{
-      appearance:none;
-      border:1px solid var(--border);
-      background: rgba(255,255,255,0.06);
-      color:var(--text);
-      padding:10px 12px;
-      border-radius:12px;
-      font-weight:650;
-      cursor:pointer;
-      transition: transform 0.05s ease, background 0.15s ease, border 0.15s ease;
-    }
-    .btn:hover{background: rgba(255,255,255,0.10)}
-    .btn:active{transform: translateY(1px)}
-    .btn.primary{
-      background: linear-gradient(180deg, rgba(122,162,255,0.95), rgba(122,162,255,0.65));
-      border:1px solid rgba(122,162,255,0.55);
-      color:#0b1020;
-    }
-    .btn.primary:hover{background: linear-gradient(180deg, rgba(122,162,255,1), rgba(122,162,255,0.72))}
-    .btn.green{
-      background: linear-gradient(180deg, rgba(34,197,94,0.95), rgba(34,197,94,0.65));
-      border:1px solid rgba(34,197,94,0.55);
-      color:#07150e;
-    }
-
-    input[type="file"]{
-      width: 340px;
-      max-width: 100%;
-      padding:10px;
-      border-radius:12px;
-      border:1px dashed var(--border);
-      background: rgba(0,0,0,0.18);
-      color: var(--muted);
-    }
-
-    select{
-      padding:10px 12px;
-      border-radius:12px;
-      border:1px solid var(--border);
-      background: rgba(0,0,0,0.18);
-      color: var(--text);
-      min-width: 260px;
-      max-width: 100%;
-      outline: none;
-    }
-    select option{
-      background: #0b1020;
-      color: var(--text);
-    }
-
-    .status{
-      margin-top:6px;
-      color: var(--muted);
-      font-size:13px;
-      min-height:18px;
-    }
-    .status strong{color: var(--text)}
-
-    /* Wave container */
-    #wavewrap{
-      position: relative;
-      width: 100%;
-      height: 260px;
-      border:1px solid var(--border);
-      border-radius: 16px;
-      background: rgba(0,0,0,0.18);
-      overflow:hidden;
-    }
-    #wave{
-      width:100%;
-      height:260px;
-    }
-    #overlay{
-      position:absolute; left:0; top:0; width:100%; height:100%;
-      pointer-events:none;
-    }
-    .seg{
-      position:absolute;
-      top:0; height:100%;
-      opacity:0.22;
-      border-right: 1px solid rgba(255,255,255,0.05);
-    }
-    #cursor{
-      position:absolute;
-      top:0;
-      width:2px;
-      height:100%;
-      background: var(--danger);
-      pointer-events:none;
-      box-shadow: 0 0 0 1px rgba(239,68,68,0.18);
-    }
-
-    /* Legend */
-    .legend{
-      display:flex;
-      flex-wrap:wrap;
-      gap:10px 14px;
-      margin-top:12px;
-      align-items:flex-start;
-    }
-    .legend-item{
-      display:flex;
-      align-items:center;
-      gap:10px;
-      padding:10px 12px;
-      border-radius:14px;
-      border:1px solid var(--border);
-      background: rgba(0,0,0,0.18);
-    }
-    .swatch{
-      width:12px; height:12px; border-radius:3px;
-      box-shadow: 0 0 0 1px rgba(255,255,255,0.15) inset;
-    }
-    .legend-text{
-      display:flex; flex-direction:column; gap:2px;
-    }
-    .legend-title{
-      font-size:13px; font-weight:750; color:var(--text);
-      line-height:1.1;
-    }
-    .legend-sub{
-      font-size:12px; color:var(--muted);
-    }
-    .rename{
-      margin-left:8px;
-      width:140px;
-      max-width: 40vw;
-      padding:8px 10px;
-      border-radius:12px;
-      border:1px solid var(--border);
-      background: rgba(255,255,255,0.06);
-      color: var(--text);
-      font-size:13px;
-      outline:none;
-    }
-
-    details{
-      margin-top:12px;
-      border-radius:14px;
-      border:1px solid var(--border);
-      background: rgba(0,0,0,0.18);
-      overflow:hidden;
-    }
-    summary{
-      cursor:pointer;
-      padding:12px 14px;
-      color: var(--muted);
-      font-weight:650;
-      user-select:none;
-    }
-    pre{
-      margin:0;
-      padding:12px 14px;
-      border-top:1px solid var(--border);
-      overflow:auto;
-      color: #d6dbff;
-      background: rgba(0,0,0,0.12);
-      font-size:12px;
-      line-height:1.35;
-    }
-
-    .spacer{height:12px}
-    .divider{
-      height:1px;
-      width:100%;
-      background: var(--border);
-      margin: 10px 0 14px 0;
+    .drop.drag { border-color: var(--brand); background: #17352c; }
+    .drop input { width: min(100%, 440px); }
+    input[type="file"] { color: var(--muted); }
+    .drop strong { display: block; margin-bottom: 5px; font-size: 17px; }
+    .drop small { color: var(--muted); }
+    .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+    .button { border: 1px solid var(--line); border-radius: 11px; padding: 10px 15px; color: var(--ink); background: var(--surface-soft); font-weight: 750; }
+    .button:hover { border-color: #668078; }
+    .button.primary { border-color: var(--brand); color: white; background: var(--brand); }
+    .button.primary:hover { background: var(--brand-dark); }
+    .button:disabled { cursor: not-allowed; opacity: .5; }
+    select, input[type="number"] { border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; color: var(--ink); background: var(--surface-soft); }
+    .status { min-height: 24px; margin-top: 14px; color: var(--muted); }
+    .status.error { color: var(--danger); }
+    .busy::after { content: ""; display: inline-block; width: 13px; height: 13px; margin-left: 9px; border: 2px solid #c9cfcb; border-top-color: var(--brand); border-radius: 50%; vertical-align: -2px; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 18px 0; }
+    .metric { padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-soft); }
+    .metric span { display: block; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .07em; }
+    .metric strong { display: block; margin-top: 4px; font-size: 24px; letter-spacing: -.035em; }
+    audio { width: 100%; margin: 4px 0 12px; }
+    .wave { position: relative; height: 180px; overflow: hidden; border: 1px solid var(--line); border-radius: 15px; background: #09120f; }
+    #waveCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    #segmentLayer { position: absolute; inset: 0; pointer-events: none; }
+    .segment-band { position: absolute; bottom: 0; height: 24px; opacity: .75; }
+    #playCursor { position: absolute; top: 0; bottom: 0; width: 2px; background: #e63f31; pointer-events: none; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; }
+    .legend-chip { display: flex; align-items: center; gap: 7px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-soft); font-size: 12px; }
+    .swatch { width: 10px; height: 10px; border-radius: 3px; }
+    .turns { max-height: 370px; overflow: auto; border: 1px solid var(--line); border-radius: 14px; }
+    .turn { display: grid; grid-template-columns: 105px 1fr 80px; gap: 12px; padding: 11px 13px; border-bottom: 1px solid var(--line); align-items: center; }
+    .turn:last-child { border: 0; }
+    .speaker { font-weight: 800; }
+    .bar { height: 7px; border-radius: 999px; }
+    .time { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+    .options { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 16px; }
+    .option { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+    .option input[type="number"] { width: 86px; }
+    .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+    .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 14px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
+    th, td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; }
+    th { position: sticky; top: 0; color: var(--muted); background: #13231e; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+    th:first-child, td:first-child { text-align: left; }
+    tfoot td { color: white; background: var(--brand); font-weight: 800; }
+    details { margin-top: 16px; border: 1px solid var(--line); border-radius: 12px; }
+    summary { padding: 11px 13px; cursor: pointer; color: var(--muted); font-weight: 700; }
+    pre { max-height: 360px; overflow: auto; margin: 0; padding: 14px; border-top: 1px solid var(--line); background: #050a08; color: #d8e4de; font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .hidden { display: none !important; }
+    @media (max-width: 780px) {
+      .shell { width: min(100% - 20px, 1120px); padding-top: 18px; }
+      header, .card-head { align-items: flex-start; flex-direction: column; }
+      .hero { grid-template-columns: 1fr; }
+      .intro, .card { padding: 19px; }
+      .facts { display: grid; grid-template-columns: repeat(2, 1fr); }
+      .fact { border-right: 1px solid rgba(255,255,255,.17); border-bottom: 0; padding: 8px; }
+      .metrics, .summary { grid-template-columns: repeat(2, 1fr); }
+      .turn { grid-template-columns: 92px 1fr; }
+      .turn .time { grid-column: 1 / -1; text-align: left; }
     }
   </style>
 </head>
-
 <body>
-  <div class="container">
-    <div class="header">
-      <div>
-        <h1 class="title">Speaker Diarization Viewer</h1>
-        <p class="subtitle">Upload audio → backend returns segments → waveform + colored speakers + cursor synced to playback.</p>
+  <main class="shell">
+    <header>
+      <div class="brand">
+        <div class="brand-mark">SD</div>
+        <h1>Speaker Diarization Studio</h1>
       </div>
-      <div class="pill" id="pill">Backend: <strong>&nbsp;127.0.0.1:8000</strong></div>
-    </div>
+      <div class="health"><span class="dot" id="healthDot"></span><span id="healthText">Connecting…</span></div>
+    </header>
 
-    <div class="card">
-      <div class="card-inner">
-        <div class="row">
-          <input type="file" id="file" />
-          <button class="btn primary" id="run">Upload + Diarize</button>
-          <button class="btn green" id="play">Play / Pause</button>
-          <button class="btn" id="stop">Stop</button>
-        </div>
-
-        <div class="divider"></div>
-
-        <div class="row">
-          <select id="sample"></select>
-          <button class="btn primary" id="runSample">Try Sample</button>
-          <div class="pill" id="sampleHint">Uses <code>/diarize_url</code> (backend must expose samples)</div>
-        </div>
-
-        <div class="status" id="status">Status: <strong>Idle</strong></div>
-
-        <div id="wavewrap" class="spacer">
-          <div id="wave"></div>
-          <div id="overlay"></div>
-          <div id="cursor"></div>
-        </div>
-
-        <div class="legend" id="legend"></div>
-
-        <details>
-          <summary>Show raw JSON response</summary>
-          <pre id="out">{}</pre>
-        </details>
+    <section class="hero">
+      <div class="intro">
+        <h2>Find out who spoke, and when.</h2>
+        <p>Run private, local speaker diarization on any common audio format—or measure accuracy against RTTM annotations.</p>
       </div>
-    </div>
-  </div>
+      <div class="facts">
+        <div class="fact"><span>Pipeline</span><strong>VAD + ECAPA</strong></div>
+        <div class="fact"><span>Clustering</span><strong id="thresholdFact">0.85</strong></div>
+        <div class="fact"><span>Processing</span><strong>On device</strong></div>
+        <div class="fact"><span>Tested weighted DER</span><strong>9.54%</strong><small>33 VoxConverse dev recordings · 0.25 s collar</small></div>
+      </div>
+    </section>
 
-  <script src="https://unpkg.com/wavesurfer.js@7"></script>
+    <nav class="tabs" aria-label="Application mode">
+      <button class="tab active" data-mode="diarize">Diarize audio</button>
+      <button class="tab" data-mode="evaluate">Test accuracy</button>
+    </nav>
+
+    <section class="panel" id="diarizePanel">
+      <div class="card">
+        <div class="card-head">
+          <div><h3>Choose an audio file</h3><p class="help">WAV, MP3, M4A, FLAC, OGG, MP4, and WebM are supported.</p></div>
+        </div>
+        <label class="drop" id="audioDrop">
+          <div><strong>Drop audio here or choose a file</strong><small id="audioFileName">No file selected</small></div>
+          <input id="audioFile" type="file" accept="audio/*,.mp4,.webm">
+        </label>
+        <div class="actions">
+          <button class="button primary" id="diarizeButton" disabled>Run diarization</button>
+          <select id="sampleSelect" aria-label="Sample recording">
+            <option value="">Or choose a sample…</option>
+            <option value="/samples/interview.wav">Interview</option>
+            <option value="/samples/five_speakers.wav">Five speakers</option>
+          </select>
+        </div>
+        <div class="status" id="diarizeStatus">Ready.</div>
+      </div>
+
+      <div class="card hidden" id="diarizeResults">
+        <div class="card-head"><div><h3 id="resultTitle">Diarization result</h3><p class="help">Speaker labels identify clusters, not real-world identities.</p></div></div>
+        <div class="metrics">
+          <div class="metric"><span>Duration</span><strong id="durationMetric">—</strong></div>
+          <div class="metric"><span>Speakers</span><strong id="speakerMetric">—</strong></div>
+          <div class="metric"><span>Turns</span><strong id="turnMetric">—</strong></div>
+          <div class="metric"><span>Threshold</span><strong id="thresholdMetric">—</strong></div>
+        </div>
+        <audio id="audioPlayer" controls></audio>
+        <div class="wave">
+          <canvas id="waveCanvas"></canvas><div id="segmentLayer"></div><div id="playCursor"></div>
+        </div>
+        <div class="legend" id="speakerLegend"></div>
+        <h3 style="margin-top:22px">Speaker turns</h3>
+        <div class="turns" id="turnList"></div>
+        <details><summary>Raw JSON</summary><pre id="diarizeJson"></pre></details>
+      </div>
+    </section>
+
+    <section class="panel" id="evaluatePanel" hidden>
+      <div class="card">
+        <div class="card-head">
+          <div><h3>Add an annotated dataset</h3><p class="help">Choose a folder containing matching audio and RTTM files, such as <code>audio/abc.wav</code> and <code>rttm/abc.rttm</code>.</p></div>
+        </div>
+        <label class="drop" id="datasetDrop">
+          <div><strong>Choose the dataset folder</strong><small id="datasetSummary">No dataset selected</small></div>
+          <input id="datasetFiles" type="file" multiple webkitdirectory directory>
+        </label>
+        <div class="options">
+          <label class="option">DER collar <input id="collar" type="number" min="0" step="0.05" value="0.25"> seconds</label>
+          <label class="option"><input id="ignoreOverlap" type="checkbox"> Ignore overlapping speech</label>
+        </div>
+        <div class="actions"><button class="button primary" id="evaluateButton" disabled>Run accuracy test</button></div>
+        <div class="status" id="evaluateStatus">Select a dataset folder to begin.</div>
+      </div>
+
+      <div class="card hidden" id="evaluationResults">
+        <div class="card-head">
+          <div><h3>Accuracy report</h3><p class="help">Lower DER is better.</p></div>
+          <div class="actions" style="margin-top:0"><button class="button" id="csvButton">Download CSV</button><button class="button" id="jsonButton">Download JSON</button></div>
+        </div>
+        <div class="summary">
+          <div class="metric"><span>Weighted DER</span><strong id="weightedDer">—</strong></div>
+          <div class="metric"><span>Aggregate DER</span><strong id="aggregateDer">—</strong></div>
+          <div class="metric"><span>Files</span><strong id="fileCount">—</strong></div>
+          <div class="metric"><span>Total audio</span><strong id="totalAudio">—</strong></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>File</th><th>Duration</th><th>DER</th><th>Speakers P/R</th><th>Miss</th><th>False alarm</th><th>Confusion</th></tr></thead>
+            <tbody id="evaluationBody"></tbody>
+            <tfoot><tr><td>Duration-weighted DER</td><td id="footerDuration"></td><td id="footerDer"></td><td colspan="4"></td></tr></tfoot>
+          </table>
+        </div>
+        <details><summary>Raw JSON</summary><pre id="evaluationJson"></pre></details>
+      </div>
+    </section>
+  </main>
+
   <script>
-    const API = "http://127.0.0.1:8000";
+    const colors = ["#2ba47f", "#e9943a", "#8276ef", "#e15a70", "#27a8c4", "#9aaa58", "#b55de2", "#d08a3e", "#20a775", "#7d89d5"];
+    const audioExtensions = new Set(["wav", "mp3", "m4a", "aac", "flac", "ogg", "opus", "mp4", "webm"]);
+    let selectedAudio = null;
+    let selectedDatasetFiles = [];
+    let latestEvaluation = null;
+    let waveformBuffer = null;
+    let waveformSegments = [];
 
-    const overlay = document.getElementById("overlay");
-    const cursor = document.getElementById("cursor");
-    const out = document.getElementById("out");
-    const statusEl = document.getElementById("status");
-    const legendEl = document.getElementById("legend");
-    const sampleSelect = document.getElementById("sample");
+    const $ = (id) => document.getElementById(id);
+    const formatDuration = (seconds) => {
+      seconds = Number(seconds || 0);
+      if (seconds < 60) return `${seconds.toFixed(1)}s`;
+      const minutes = Math.floor(seconds / 60);
+      return `${minutes}m ${(seconds % 60).toFixed(0)}s`;
+    };
+    const speakerColor = (speaker) => colors[Math.abs(Number(speaker)) % colors.length];
+    const extension = (name) => name.toLowerCase().split(".").pop();
+    const stem = (name) => name.split(/[\\/]/).pop().replace(/\.[^.]+$/, "");
 
-    let ws = null;
-    let duration = 1;
-    let speakerNames = {}; // speakerId -> custom name
-
-    function setStatus(text){
-      statusEl.innerHTML = "Status: <strong>" + text + "</strong>";
+    async function request(path, options = {}) {
+      const response = await fetch(path, options);
+      const data = await response.json().catch(() => ({ detail: response.statusText }));
+      if (!response.ok) throw new Error(data.detail || "Request failed");
+      return data;
     }
 
-    function colorForSpeaker(k) {
-      const colors = ["#7aa2ff","#22c55e","#ff7f0e","#ef4444","#a855f7","#14b8a6","#eab308","#f97316","#60a5fa","#34d399"];
-      return colors[Math.abs(k) % colors.length];
+    function setStatus(element, text, busy = false, error = false) {
+      element.textContent = text;
+      element.classList.toggle("busy", busy);
+      element.classList.toggle("error", error);
     }
 
-    function uniqueSpeakers(segments){
-      const set = new Set();
-      (segments || []).forEach(s => set.add(Number(s.speaker)));
-      return Array.from(set).sort((a,b)=>a-b);
+    document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("active", item === tab));
+      $("diarizePanel").hidden = tab.dataset.mode !== "diarize";
+      $("evaluatePanel").hidden = tab.dataset.mode !== "evaluate";
+    }));
+
+    request("/api/health").then((data) => {
+      $("healthDot").classList.add("online");
+      $("healthText").textContent = data.ffmpeg ? "Ready · processing locally" : "ffmpeg is missing";
+      $("thresholdFact").textContent = Number(data.clusteringThreshold).toFixed(2);
+    }).catch(() => { $("healthText").textContent = "Backend unavailable"; });
+
+    function selectAudio(file) {
+      selectedAudio = file;
+      $("audioFileName").textContent = file ? `${file.name} · ${(file.size / 1048576).toFixed(1)} MB` : "No file selected";
+      $("diarizeButton").disabled = !file;
     }
+    $("audioFile").addEventListener("change", (event) => selectAudio(event.target.files[0]));
+    ["dragenter", "dragover"].forEach((name) => $("audioDrop").addEventListener(name, (event) => { event.preventDefault(); $("audioDrop").classList.add("drag"); }));
+    ["dragleave", "drop"].forEach((name) => $("audioDrop").addEventListener(name, (event) => { event.preventDefault(); $("audioDrop").classList.remove("drag"); }));
+    $("audioDrop").addEventListener("drop", (event) => selectAudio(event.dataTransfer.files[0]));
+    $("sampleSelect").addEventListener("change", async (event) => {
+      if (!event.target.value) return;
+      const response = await fetch(event.target.value);
+      const blob = await response.blob();
+      selectAudio(new File([blob], event.target.value.split("/").pop(), { type: blob.type || "audio/wav" }));
+    });
 
-    function renderSegments(segments) {
-      overlay.innerHTML = "";
-      (segments || []).forEach(seg => {
-        const div = document.createElement("div");
-        div.className = "seg";
-        div.style.left = (seg.start / duration * 100) + "%";
-        div.style.width = ((seg.end - seg.start) / duration * 100) + "%";
-        div.style.background = colorForSpeaker(seg.speaker);
-        overlay.appendChild(div);
-      });
-    }
-
-    function setCursor(t) {
-      const pct = (t / duration) * 100;
-      cursor.style.left = pct + "%";
-    }
-
-    function renderLegend(segments){
-      legendEl.innerHTML = "";
-      const speakers = uniqueSpeakers(segments);
-      if (speakers.length === 0){
-        legendEl.innerHTML = `<div class="pill">No speakers detected</div>`;
-        return;
-      }
-
-      speakers.forEach(spk => {
-        const item = document.createElement("div");
-        item.className = "legend-item";
-
-        const sw = document.createElement("div");
-        sw.className = "swatch";
-        sw.style.background = colorForSpeaker(spk);
-
-        const txt = document.createElement("div");
-        txt.className = "legend-text";
-
-        const title = document.createElement("div");
-        title.className = "legend-title";
-        title.textContent = speakerNames[spk] ? speakerNames[spk] : `SPEAKER_${String(spk).padStart(2,"0")}`;
-
-        const sub = document.createElement("div");
-        sub.className = "legend-sub";
-        sub.textContent = "Rename:";
-
-        const input = document.createElement("input");
-        input.className = "rename";
-        input.placeholder = "Name (optional)";
-        input.value = speakerNames[spk] || "";
-        input.addEventListener("input", (e) => {
-          speakerNames[spk] = e.target.value.trim();
-          renderLegend(segments);
-        });
-
-        txt.appendChild(title);
-        txt.appendChild(sub);
-
-        item.appendChild(sw);
-        item.appendChild(txt);
-        item.appendChild(input);
-
-        legendEl.appendChild(item);
-      });
-    }
-
-    async function diarizeUpload(file) {
+    $("diarizeButton").addEventListener("click", async () => {
+      if (!selectedAudio) return;
       const form = new FormData();
-      form.append("file", file);
-      const res = await fetch(API + "/diarize", { method: "POST", body: form });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
+      form.append("file", selectedAudio, selectedAudio.name);
+      $("diarizeButton").disabled = true;
+      setStatus($("diarizeStatus"), "Diarizing audio. The first run may download the speaker model…", true);
+      try {
+        const data = await request("/api/diarize", { method: "POST", body: form });
+        renderDiarization(data);
+        setStatus($("diarizeStatus"), "Diarization complete.");
+      } catch (error) {
+        setStatus($("diarizeStatus"), error.message, false, true);
+      } finally {
+        $("diarizeButton").disabled = false;
+      }
+    });
+
+    async function renderDiarization(data) {
+      $("diarizeResults").classList.remove("hidden");
+      $("resultTitle").textContent = data.filename;
+      $("durationMetric").textContent = formatDuration(data.duration);
+      $("speakerMetric").textContent = data.speakerCount;
+      $("turnMetric").textContent = data.speakers.length;
+      $("thresholdMetric").textContent = Number(data.clusteringThreshold).toFixed(2);
+      $("diarizeJson").textContent = JSON.stringify(data, null, 2);
+      $("audioPlayer").src = data.audioUrl;
+      waveformSegments = data.speakers || [];
+      renderSegments(data.duration, waveformSegments);
+      renderTurns(waveformSegments);
+      try {
+        const arrayBuffer = await fetch(data.audioUrl).then((response) => response.arrayBuffer());
+        const context = new (window.AudioContext || window.webkitAudioContext)();
+        waveformBuffer = await context.decodeAudioData(arrayBuffer);
+        drawWaveform();
+        await context.close();
+      } catch (_) {
+        waveformBuffer = null;
+        drawWaveform();
+      }
+      $("diarizeResults").scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
-    async function diarizeSampleUrl(sampleUrl) {
-      const res = await fetch(API + "/diarize_url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: sampleUrl })
-      });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    }
-
-    function attachWaveSurfer(audioUrl, segments){
-      if (ws) ws.destroy();
-
-      ws = WaveSurfer.create({
-        container: "#wave",
-        waveColor: "#c7cbe1",
-        progressColor: "#6b7280",
-        cursorColor: "transparent", 
-        height: 260,
-        normalize: true
-      });
-
-      setStatus("Loading audio…");
-      ws.load(API + audioUrl);
-
-      ws.on("ready", () => {
-        duration = ws.getDuration() || 1;
-        renderSegments(segments);
-        renderLegend(segments);
-        setCursor(0);
-        setStatus(`Ready • ${duration.toFixed(2)}s • ${uniqueSpeakers(segments).length} speaker(s)`);
-      });
-
-      ws.on("audioprocess", () => setCursor(ws.getCurrentTime()));
-      ws.on("seek", () => setCursor(ws.getCurrentTime()));
-      ws.on("pause", () => setCursor(ws.getCurrentTime()));
-      ws.on("finish", () => setCursor(duration));
-    }
-
-    function resetUiForRun(){
-      out.textContent = "{}";
-      legendEl.innerHTML = "";
-      overlay.innerHTML = "";
-      setCursor(0);
-      speakerNames = {};
-    }
-
-    function initSamples(){
-      const SAMPLES = [
-        { name: "Choose a sample…", url: "" },
-        { name: "Interview", url: API + "/samples/interview.wav" },
-        { name: "Five Speakers", url: API + "/samples/five_speakers.wav" },
-        { name: "Five Speakers with overlap", url: API + "/samples/five_speaker_overlap.wav" }
-      ];
-
-      sampleSelect.innerHTML = "";
-      SAMPLES.forEach((s, idx) => {
-        const opt = document.createElement("option");
-        opt.value = s.url;
-        opt.textContent = s.name;
-        if (idx === 0){
-          opt.disabled = true;
-          opt.selected = true;
+    function drawWaveform() {
+      const canvas = $("waveCanvas");
+      const rect = canvas.getBoundingClientRect();
+      const ratio = window.devicePixelRatio || 1;
+      canvas.width = Math.max(1, Math.floor(rect.width * ratio));
+      canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+      const context = canvas.getContext("2d");
+      context.scale(ratio, ratio);
+      context.clearRect(0, 0, rect.width, rect.height);
+      context.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--muted").trim() || "#9bada6";
+      context.lineWidth = 1;
+      context.beginPath();
+      if (!waveformBuffer) {
+        context.moveTo(0, rect.height / 2); context.lineTo(rect.width, rect.height / 2);
+      } else {
+        const samples = waveformBuffer.getChannelData(0);
+        const step = Math.max(1, Math.floor(samples.length / rect.width));
+        const middle = (rect.height - 24) / 2;
+        for (let x = 0; x < rect.width; x++) {
+          let min = 1, max = -1;
+          const start = x * step;
+          for (let index = start; index < Math.min(start + step, samples.length); index++) {
+            min = Math.min(min, samples[index]); max = Math.max(max, samples[index]);
+          }
+          context.moveTo(x, middle + min * middle * .9);
+          context.lineTo(x, middle + max * middle * .9);
         }
-        sampleSelect.appendChild(opt);
+      }
+      context.stroke();
+    }
+    window.addEventListener("resize", drawWaveform);
+
+    function renderSegments(duration, segments) {
+      $("segmentLayer").innerHTML = "";
+      $("speakerLegend").innerHTML = "";
+      [...new Set(segments.map((item) => Number(item.speaker)))].sort((a,b) => a-b).forEach((speaker) => {
+        const chip = document.createElement("div"); chip.className = "legend-chip";
+        const swatch = document.createElement("span"); swatch.className = "swatch"; swatch.style.background = speakerColor(speaker);
+        chip.append(swatch, document.createTextNode(`Speaker ${speaker + 1}`)); $("speakerLegend").append(chip);
+      });
+      segments.forEach((segment) => {
+        const band = document.createElement("div"); band.className = "segment-band";
+        band.style.left = `${segment.start / duration * 100}%`;
+        band.style.width = `${(segment.end - segment.start) / duration * 100}%`;
+        band.style.background = speakerColor(segment.speaker);
+        $("segmentLayer").append(band);
       });
     }
 
-    initSamples();
+    function renderTurns(segments) {
+      $("turnList").innerHTML = "";
+      segments.forEach((segment) => {
+        const row = document.createElement("div"); row.className = "turn";
+        const speaker = document.createElement("div"); speaker.className = "speaker"; speaker.textContent = `Speaker ${Number(segment.speaker) + 1}`;
+        const bar = document.createElement("div"); bar.className = "bar"; bar.style.background = speakerColor(segment.speaker);
+        const time = document.createElement("div"); time.className = "time"; time.textContent = `${segment.start.toFixed(2)}–${segment.end.toFixed(2)}s`;
+        row.append(speaker, bar, time); $("turnList").append(row);
+      });
+    }
+    $("audioPlayer").addEventListener("timeupdate", () => {
+      const player = $("audioPlayer");
+      $("playCursor").style.left = `${player.duration ? player.currentTime / player.duration * 100 : 0}%`;
+    });
 
-    document.getElementById("run").onclick = async () => {
-      const f = document.getElementById("file").files[0];
-      if (!f) return;
+    function inspectDataset(files) {
+      selectedDatasetFiles = [...files].filter((file) => extension(file.name) === "rttm" || audioExtensions.has(extension(file.name)));
+      const audio = new Set(selectedDatasetFiles.filter((file) => audioExtensions.has(extension(file.name))).map((file) => stem(file.name)));
+      const rttm = new Set(selectedDatasetFiles.filter((file) => extension(file.name) === "rttm").map((file) => stem(file.name)));
+      const matched = [...audio].filter((id) => rttm.has(id)).length;
+      const unmatched = audio.size + rttm.size - matched * 2;
+      $("datasetSummary").textContent = `${matched} matched pair${matched === 1 ? "" : "s"}${unmatched ? ` · ${unmatched} unmatched file(s)` : ""}`;
+      $("evaluateButton").disabled = matched === 0 || unmatched > 0;
+      setStatus($("evaluateStatus"), unmatched ? "Every audio file must have an RTTM with the same basename." : `${matched} pair(s) ready.` , false, unmatched > 0);
+    }
+    $("datasetFiles").addEventListener("change", (event) => inspectDataset(event.target.files));
 
-      try{
-        resetUiForRun();
-        setStatus("Uploading + diarizing…");
-
-        const data = await diarizeUpload(f);
-        out.textContent = JSON.stringify(data, null, 2);
-        attachWaveSurfer(data.audioUrl, data.speakers || []);
-      } catch(err){
-        setStatus("Error (see JSON)");
-        out.textContent = String(err);
-        console.error(err);
+    $("evaluateButton").addEventListener("click", async () => {
+      const form = new FormData();
+      selectedDatasetFiles.forEach((file) => form.append("files", file, file.name));
+      form.append("collar", $("collar").value);
+      form.append("ignore_overlap", $("ignoreOverlap").checked ? "true" : "false");
+      $("evaluateButton").disabled = true;
+      setStatus($("evaluateStatus"), `Evaluating ${selectedDatasetFiles.length / 2} recording(s). Keep this page open…`, true);
+      try {
+        latestEvaluation = await request("/api/evaluate", { method: "POST", body: form });
+        renderEvaluation(latestEvaluation);
+        setStatus($("evaluateStatus"), "Accuracy test complete.");
+      } catch (error) {
+        setStatus($("evaluateStatus"), error.message, false, true);
+      } finally {
+        $("evaluateButton").disabled = false;
       }
-    };
+    });
 
-    document.getElementById("runSample").onclick = async () => {
-      const url = sampleSelect.value;
-      if (!url){
-        setStatus("Pick a sample first");
-        return;
-      }
+    function renderEvaluation(data) {
+      $("evaluationResults").classList.remove("hidden");
+      $("weightedDer").textContent = `${data.durationWeightedDerPercent.toFixed(2)}%`;
+      $("aggregateDer").textContent = `${data.aggregateDerPercent.toFixed(2)}%`;
+      $("fileCount").textContent = data.files;
+      $("totalAudio").textContent = formatDuration(data.totalDurationSeconds);
+      $("footerDuration").textContent = formatDuration(data.totalDurationSeconds);
+      $("footerDer").textContent = `${data.durationWeightedDerPercent.toFixed(3)}%`;
+      $("evaluationBody").innerHTML = "";
+      data.results.forEach((row) => {
+        const tr = document.createElement("tr");
+        [row.filename, formatDuration(row.durationSeconds), `${row.derPercent.toFixed(3)}%`, `${row.predictedSpeakers}/${row.referenceSpeakers}`, row.missedSpeechSeconds.toFixed(2), row.falseAlarmSeconds.toFixed(2), row.speakerConfusionSeconds.toFixed(2)].forEach((value) => {
+          const td = document.createElement("td"); td.textContent = value; tr.append(td);
+        });
+        $("evaluationBody").append(tr);
+      });
+      const clean = { ...data }; delete clean.csv;
+      $("evaluationJson").textContent = JSON.stringify(clean, null, 2);
+      $("evaluationResults").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
 
-      try{
-        resetUiForRun();
-        setStatus("Fetching sample + diarizing…");
-
-        const data = await diarizeSampleUrl(url);
-        out.textContent = JSON.stringify(data, null, 2);
-        attachWaveSurfer(data.audioUrl, data.speakers || []);
-      } catch(err){
-        setStatus("Error (see JSON)");
-        out.textContent = String(err);
-        console.error(err);
-      }
-    };
-
-    document.getElementById("play").onclick = () => {
-      if (ws) ws.playPause();
-    };
-
-    document.getElementById("stop").onclick = () => {
-      if (!ws) return;
-      ws.pause();
-      ws.seekTo(0);
-      setCursor(0);
-    };
+    function download(name, content, type) {
+      const url = URL.createObjectURL(new Blob([content], { type }));
+      const link = document.createElement("a"); link.href = url; link.download = name; link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+    $("csvButton").addEventListener("click", () => latestEvaluation && download("diarization_accuracy.csv", latestEvaluation.csv, "text/csv"));
+    $("jsonButton").addEventListener("click", () => {
+      if (!latestEvaluation) return;
+      const clean = { ...latestEvaluation }; delete clean.csv;
+      download("diarization_accuracy.json", JSON.stringify(clean, null, 2), "application/json");
+    });
   </script>
 </body>
 </html>
